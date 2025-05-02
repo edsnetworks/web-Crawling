@@ -16,22 +16,18 @@ check_robots() {
 download_md() {
   local url="$1"
   local filename="${OUTPUT_DIR}/$(echo "$url" | sed 's/[^a-zA-Z0-9._-]/-/g').md"
-
   # Check if html2text is installed.  Provide a helpful error message if not.
   if ! command -v html2text &> /dev/null; then
     echo "Error: html2text is not installed. Please install it (e.g., apt install html2text or yum install html2text)." >&2
     return 1
   fi
-
   # Use curl to download the HTML and pipe it to html2text
   curl -sL "$url" | html2text -width 0 > "$filename"
-
   # Check for errors
   if [ $? -ne 0 ]; then
     echo "Error downloading or processing '$url'" >&2
     return 1
   fi
-
   echo "Downloaded and converted '$url' to '$filename'"
 }
 crawl() {
@@ -74,16 +70,43 @@ if ! [[ "$sitemap_url" =~ ^(http|https):// ]]; then
   echo "Error: Invalid Sitemap URL.  Must start with http:// or https://."
   exit 1
 fi
+
+# Function to handle gzipped sitemaps
+handle_sitemap() {
+  local url="$1"
+  local temp_file="/tmp/sitemap_temp.xml"
+
+  # Check if the content-encoding header indicates gzip compression
+  if curl -sI "$url" | grep -q "Content-Encoding: gzip"; then
+    echo "Detected gzipped sitemap. Decompressing..."
+    curl -s -H "Accept-Encoding: gzip, deflate" "$url" | gunzip > "$temp_file"
+  else
+    echo "Sitemap is not gzipped.  Downloading directly..."
+    curl -s "$url" > "$temp_file"
+  fi
+
+  # Process the sitemap (extract URLs)
+  sitemap_urls=$(cat "$temp_file" | grep -oP '<loc>(.*?)</loc>' | sed 's/<loc>//g' | sed 's/<\/loc>//g')
+
+  # Remove the temporary file
+  rm "$temp_file"
+
+  #Return the URLs
+  echo "$sitemap_urls"
+}
+
 # Crawl from sitemap
-sitemap_urls=$(curl -sL -A "My Web Crawler/1.0" "$sitemap_url" | grep -oP '<loc>(.*?)</loc>' | sed 's/<loc>//g' | sed 's/<\/loc>//g')
+sitemap_urls=$(handle_sitemap "$sitemap_url")
+
 if [[ -z "$sitemap_urls" ]]; then
   echo "Error: Could not retrieve URLs from the sitemap. Check the URL and sitemap format."
   exit 1
 fi
-# Initialize the visited URLs array
-visited_urls=()
-while IFS= read -r sitemap_url_item; do
-  crawl "$sitemap_url_item"
-  sleep "$SLEEP_TIME"
+
+# Initialize visited_urls array
+declare -a visited_urls
+
+# Process each URL
+while IFS= read -r url; do
+  crawl "$url"
 done <<< "$sitemap_urls"
-echo "Crawling completed."
