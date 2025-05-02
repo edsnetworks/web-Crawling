@@ -15,13 +15,24 @@ check_robots() {
 }
 download_md() {
   local url="$1"
-  local filename=$(echo "$url" | sed 's/[^a-zA-Z0-9._-]/-/g')
-  filename="$OUTPUT_DIR/$filename.md"
-  curl -sL "$url" -o "$filename"
-  if [ $? -ne 0 ]; then
-    echo "Error downloading $url" >&2
+  local filename="${OUTPUT_DIR}/$(echo "$url" | sed 's/[^a-zA-Z0-9._-]/-/g').md"
+
+  # Check if html2text is installed.  Provide a helpful error message if not.
+  if ! command -v html2text &> /dev/null; then
+    echo "Error: html2text is not installed. Please install it (e.g., apt install html2text or yum install html2text)." >&2
     return 1
   fi
+
+  # Use curl to download the HTML and pipe it to html2text
+  curl -sL "$url" | html2text -width 0 > "$filename"
+
+  # Check for errors
+  if [ $? -ne 0 ]; then
+    echo "Error downloading or processing '$url'" >&2
+    return 1
+  fi
+
+  echo "Downloaded and converted '$url' to '$filename'"
 }
 crawl() {
   local url="$1"
