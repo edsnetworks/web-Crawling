@@ -1,9 +1,8 @@
 #!/bin/bash
 # Configuration
-OUTPUT_DIR="./output"  # Changed to relative path
-CRAWL4AI_URL="http://your-server-ip:11235/"
+OUTPUT_DIR="./output"
+CRAWL4AI_URL="http://192.168.0.78:11235/"
 SLEEP_TIME=1  # Seconds to wait between requests
-
 # --- Functions ---
 urlencode() {
   python3 -c "import urllib.parse; print(urllib.parse.quote('$1'))"
@@ -26,6 +25,13 @@ download_md() {
 }
 crawl() {
   local url="$1"
+  # Check if the URL has already been visited
+  if [[ -v visited_urls ]]; then  # Check if the array is defined
+    if [[ " ${visited_urls[@]} " =~ " ${url} " ]]; then
+      echo "Skipping already visited URL: $url" >&2
+      return 1
+    fi
+  fi
   if check_robots "$url"; then
     echo "Skipping $url (robots.txt)" >&2
     return 1
@@ -37,15 +43,17 @@ crawl() {
     return 1
   fi
   download_md "$url" # Add this line
-  # ... (rest of your crawling logic)
+  # Add the URL to the visited array
+  if [[ -v visited_urls ]]; then
+      visited_urls+=("$url")
+  else
+      visited_urls=("$url")
+  fi
 }
-
 # --- Main ---
 mkdir -p "$OUTPUT_DIR"
-
 # Ask the user for the sitemap URL
 read -p "Enter the URL of the sitemap: " sitemap_url
-
 # Basic URL validation
 if [[ -z "$sitemap_url" ]]; then
   echo "Error: Sitemap URL cannot be empty."
@@ -55,18 +63,16 @@ if ! [[ "$sitemap_url" =~ ^(http|https):// ]]; then
   echo "Error: Invalid Sitemap URL.  Must start with http:// or https://."
   exit 1
 fi
-
 # Crawl from sitemap
 sitemap_urls=$(curl -sL -A "My Web Crawler/1.0" "$sitemap_url" | grep -oP '<loc>(.*?)</loc>' | sed 's/<loc>//g' | sed 's/<\/loc>//g')
-
 if [[ -z "$sitemap_urls" ]]; then
   echo "Error: Could not retrieve URLs from the sitemap. Check the URL and sitemap format."
   exit 1
 fi
-
+# Initialize the visited URLs array
+visited_urls=()
 while IFS= read -r sitemap_url_item; do
   crawl "$sitemap_url_item"
   sleep "$SLEEP_TIME"
 done <<< "$sitemap_urls"
-
 echo "Crawling completed."
