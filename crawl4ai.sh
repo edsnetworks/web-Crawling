@@ -2,7 +2,7 @@
 # Configuration
 OUTPUT_DIR="./output"
 CRAWL4AI_URL="http://your-server-ip:11235/"  #replace with your server IP or in the same machine use localhost or host.docker.internal
-SLEEP_TIME=1  # Seconds to wait between requests
+SLEEP_TIME=1  # Seconds to wait between requests. if the host block your request  increase the value
 # --- Functions ---
 urlencode() {
   python3 -c "import urllib.parse; print(urllib.parse.quote('$1'))"
