@@ -5,3 +5,4 @@ run it and when asked paste the sitemap.xml you want srape.
 wait until is finished
 and output directory is /output in the same folder you run it.
 enjoy
+tested on different websites  with 16kpages and the result are precise, clean and zero waste of data. The little difference from cheerio and other raw crawler is the filter html2text: is a good reasonable choice that convert the raw format in clear text.
